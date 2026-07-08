@@ -94,8 +94,42 @@ __global__ void matmul_at_b_kernel(const float* A, const float* B, float* C, int
         C[row * N + col] = dot_product;
 }
 
-# Step 4 - matmul_a_bt_kernel (not yet solved)
-# TODO: implement
+# Step 4 - matmul_a_bt_kernel
+#define TILE 16
+
+__global__ void matmul_a_bt_kernel(const float* A, const float* B, float* C, int M, int N, int K) {
+    // TODO: compute C[i, j] = sum_k A[i, k] * B[j, k]
+    __shared__ float a[TILE][TILE];
+    __shared__ float b[TILE][TILE];
+
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+    int row = blockIdx.y * TILE + ty;
+    int col = blockIdx.x * TILE + tx;
+
+    float dot_product = 0.0f;
+    for (int j = 0; j < (K - 1 + TILE) / TILE; ++j) {
+        int a_col = j * TILE + tx;
+
+        int b_row = col;
+        int b_col = j * TILE + ty;
+
+        if (b_row < N && b_col < K)
+            b[ty][tx] = B[b_row * K + b_col];
+        else b[ty][tx] = 0.0f;
+
+        if (row < M && a_col < K)
+            a[ty][tx] = A[row * K + a_col];
+        else a[ty][tx] = 0.0f;
+        __syncthreads();
+
+        for (int idx = 0; idx < TILE; ++idx)
+            dot_product += a[ty][idx] * b[idx][tx];
+        __syncthreads();
+    }
+    if (row < M && col < N)
+        C[row * N + col] = dot_product;
+}
 
 # Step 5 - add_bias_row_kernel (not yet solved)
 # TODO: implement
