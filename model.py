@@ -21,8 +21,40 @@ __global__ void matmul_naive_kernel(const float* A, const float* B, float* C, in
     }
 }
 
-# Step 2 - matmul_tiled_kernel (not yet solved)
-# TODO: implement
+# Step 2 - matmul_tiled_kernel
+#define TILE 16
+
+__global__ void matmul_tiled_kernel(const float* A, const float* B, float* C, int M, int N, int K) {
+    // TODO: compute C = A @ B using shared-memory tiling.
+    __shared__ float a[TILE][TILE];
+    __shared__ float b[TILE][TILE];
+
+    int tx = threadIdx.x; int ty = threadIdx.y;
+    
+    int col = blockIdx.x * TILE + tx;
+    int row = blockIdx.y * TILE + ty;
+
+    float dot_product = 0.0f;
+    for (int j = 0; j < (K - 1 + TILE) / TILE; ++j) {
+        int a_col = j * TILE + tx;
+        int b_row = j * TILE + ty;
+
+        if (row < M && a_col < K)
+            a[ty][tx] = A[row * K + a_col];
+        else a[ty][tx] = 0.0f;
+        if (b_row < K && col < N)
+            b[ty][tx] = B[b_row * N + col];
+        else b[ty][tx] = 0.0f;
+        __syncthreads();
+
+        for (int idx = 0; idx < TILE; ++idx) {
+            dot_product += a[ty][idx] * b[idx][tx];
+        }
+        __syncthreads();
+    }
+    if (row < M && col < N)
+        C[row * N + col] = dot_product;
+}
 
 # Step 3 - matmul_at_b_kernel (not yet solved)
 # TODO: implement
